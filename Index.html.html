@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>หอมจัง เบเกอรี่ - ระบบสลิป</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background: #f4f4f9; padding: 15px; margin: 0; }
+    .container { max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    h2 { text-align: center; font-size: 20px; }
+    input[type="file"], input[type="text"], textarea { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+    button { background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 5px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+    button.edit-btn { background: #ff9800; }
+    button.line-btn { background: #00B900; }
+    button.print-btn { background: #008CBA; }
+    button.next-btn { background: #333; }
+    .section { display: none; margin-top: 15px; }
+    .active { display: block; }
+    .form-group { margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 5px; }
+    .form-group label { font-size: 14px; font-weight: bold; color: #333; }
+    
+    #receipt-template-wrapper { position: absolute; left: -9999px; }
+    .receipt { background: white; width: 58mm; padding: 15px; color: #000; text-align: left; border: 1px solid #ddd; line-height: 1.4; }
+    .logo { width: 70px; display: block; margin: 0 auto 10px; }
+    .header { text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 2px;}
+    .phone, .center-text { text-align: center; font-size: 12px; }
+    .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+    .flex-row { display: flex; justify-content: space-between; font-size: 12px; }
+    .item-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+    .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 5px; }
+    .hbd-text { text-align: center; font-weight: bold; font-size: 14px; margin-top: 15px; }
+    .footer-text { text-align: center; font-size: 12px; margin-top: 10px; white-space: pre-line; }
+    #result-image { max-width: 100%; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.2); margin-top:15px; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <h2>หอมจัง เบเกอรี่ 🧁</h2>
+  
+  <div id="step-upload" class="section active">
+    <label style="font-size: 14px; color:#555;">อัปโหลดรูป (เลือกได้หลายรูป)</label>
+    <input type="file" id="imageInput" accept="image/*" multiple>
+    <button id="uploadBtn">อ่านข้อมูลออเดอร์</button>
+    <div id="status" style="text-align:center; margin-top:10px; color:#d9534f; font-weight: bold;"></div>
+  </div>
+
+  <div id="step-edit" class="section">
+    <h3 style="text-align:center; margin-top:0;">📝 ตรวจสอบและแก้ไข</h3>
+    <div class="form-group">
+      <label>ชื่อลูกค้า</label> <input type="text" id="edit-customerName">
+      <label>เลขที่ออเดอร์ (สั้น)</label> <input type="text" id="edit-shortOrderId">
+      <label>เลขอ้างอิง (LMF-...)</label> <input type="text" id="edit-orderId">
+    </div>
+    <div class="form-group">
+      <label>ข้อความอวยพร (ถ้ามี)</label> <input type="text" id="edit-hbd" placeholder="เช่น 🎂 สุขสันต์วันเกิดนะคะ 🎉">
+    </div>
+    <div class="form-group">
+      <label>ข้อความท้ายสลิป</label>
+      <textarea id="edit-footer" rows="4">ขอบคุณที่อุดหนุนโฮมเบเกอรี่เล็กๆ ของเรานะคะ 
+รอบหน้าสามารถสั่งล่วงหน้า แล้วแวะมารับขนมที่บ้านได้เลยค่ะ
+ยินดีต้อนรับเสมอค่ะ 😊</textarea>
+    </div>
+    <button id="generateBtn">🖨️ สร้างรูปสลิปพร้อมใช้งาน</button>
+    <button class="edit-btn" id="resetBtn" style="background:#888;">ยกเลิก / เริ่มใหม่</button>
+  </div>
+
+  <div id="step-result" class="section" style="text-align:center;">
+    <h3 style="color: green; margin:0;">✅ สร้างสลิปสำเร็จ!</h3>
+    <p style="font-size: 12px; color: #666; margin: 5px 0;">กดปุ่มด้านล่างเพื่อสั่งพิมพ์หรือส่ง LINE ได้ทันที</p>
+    <img id="result-image" alt="สลิปใบเสร็จ">
+    
+    <!-- ปุ่มสั่งพิมพ์ตรงจากแอป -->
+    <button class="print-btn" id="printBtn">🖨️ สั่งพิมพ์ออกเครื่องพิมพ์ (Print)</button>
+    <button class="line-btn" id="lineBtn">📤 บันทึกและส่งรูปเข้า LINE</button>
+    <button class="next-btn" id="nextBtn">➕ ทำออเดอร์ต่อไป</button>
+  </div>
+</div>
+
+<div id="receipt-template-wrapper">
+  <div id="receipt-template" class="receipt">
+    <img src="https://i.imgur.com/7k12345.png" class="logo" crossorigin="anonymous" onerror="this.style.display='none'">
+    <div class="header">หอมจัง เบเกอรี่</div>
+    <div class="phone">065-990-2463</div>
+    <div class="divider"></div>
+    <div class="center-text" style="font-size:16px; font-weight:bold; margin-bottom:5px;">ออเดอร์: <span id="r-shortOrderId"></span></div>
+    <div class="center-text" id="r-customerName" style="font-weight:bold; font-size:14px; margin-bottom:5px;"></div>
+    <div class="flex-row"><span>รหัส: <span id="r-orderId"></span></span></div>
+    <div class="flex-row"><span id="r-datetime"></span><span id="r-driverName"></span></div>
+    <div class="divider"></div>
+    <div id="r-items-container"></div>
+    <div class="divider"></div>
+    <div class="total-row"><span>ยอดรวมสุทธิ</span><span id="r-total"></span></div>
+    <div id="r-hbd" class="hbd-text"></div>
+    <div id="r-footer" class="footer-text"></div>
+  </div>
+</div>
+
+<script>
+  const GEMINI_API_KEY = 'AQ.Ab8RN6KBqBZ2v_N9U9HvGUDftEG8uSzWgodKEO7zH3VKXInwDQ';
+
+  let rawData = null;
+  let currentImageUrl = '';
+
+  function switchSection(sectionId) {
+    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+  }
+
+  function resizeImage(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 1024;
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadImages() {
+    const fileInput = document.getElementById('imageInput');
+    const statusDiv = document.getElementById('status');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    if (fileInput.files.length === 0) { 
+      alert('กรุณาเลือกรูปภาพอย่างน้อย 1 รูปครับ'); 
+      return; 
+    }
+
+    statusDiv.innerHTML = `กำลังย่อขนาดรูป (${fileInput.files.length} รูป)... ⏳`;
+    uploadBtn.disabled = true;
+
+    try {
+      const files = Array.from(fileInput.files);
+      const resizedImagesPromises = files.map(file => resizeImage(file));
+      const base64Images = await Promise.all(resizedImagesPromises);
+      
+      statusDiv.innerHTML = `กำลังส่งข้อมูลให้ AI วิเคราะห์... ⏳`;
+
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=' + GEMINI_API_KEY;
+      const prompt = `
+        Extract order details from these LINE MAN receipt images (they might be parts of the same order). Combine all items from all images into a single list. Return ONLY valid JSON format without any markdown tags.
+        Required JSON structure:
+        {
+          "shortOrderId": "string",
+          "orderId": "string",
+          "customerName": "string",
+          "driverName": "string",
+          "datetime": "string",
+          "items": [{"name": "string", "price": number}],
+          "total": number,
+          "isBirthday": boolean
+        }
+      `;
+      
+      let parts = [{"text": prompt}];
+      base64Images.forEach(base64String => {
+         parts.push({"inline_data": {"mime_type": "image/jpeg", "data": base64String.split(',')[1]}});
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ "contents": [{"parts": parts}] })
+      });
+
+      const jsonResult = await response.json();
+      if (!response.ok) {
+        throw new Error(jsonResult.error?.message || "API Error");
+      }
+
+      const resultText = jsonResult.candidates[0].content.parts[0].text;
+      const cleanJson = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+      rawData = JSON.parse(cleanJson);
+
+      statusDiv.innerHTML = "";
+      uploadBtn.disabled = false;
+      populateEditForm(rawData);
+      switchSection('step-edit');
+
+    } catch (e) {
+      statusDiv.innerHTML = "❌ เกิดข้อผิดพลาด: " + e.message;
+      uploadBtn.disabled = false;
+    }
+  }
+
+  function populateEditForm(data) {
+    document.getElementById('edit-customerName').value = (data && data.customerName) || "-";
+    document.getElementById('edit-shortOrderId').value = "#" + ((data && data.shortOrderId) || "");
+    document.getElementById('edit-orderId').value = (data && data.orderId) || "";
+    if (data && data.isBirthday) {
+      document.getElementById('edit-hbd').value = "🎂 สุขสันต์วันเกิดนะคะ 🎉";
+    }
+  }
+
+  function generateFinalReceipt() {
+    document.getElementById('r-shortOrderId').innerText = document.getElementById('edit-shortOrderId').value;
+    document.getElementById('r-customerName').innerText = document.getElementById('edit-customerName').value;
+    document.getElementById('r-orderId').innerText = document.getElementById('edit-orderId').value;
+    document.getElementById('r-datetime').innerText = (rawData && rawData.datetime) || "";
+    document.getElementById('r-driverName').innerText = (rawData && rawData.driverName) || "";
+    document.getElementById('r-total').innerText = ((rawData && rawData.total) || 0) + ".00";
+
+    let itemsHtml = '';
+    if (rawData && rawData.items) {
+      rawData.items.forEach(item => {
+        itemsHtml += `<div class="item-row"><span>${item.name || ''}</span><span>${item.price || 0}</span></div>`;
+      });
+    }
+    document.getElementById('r-items-container').innerHTML = itemsHtml;
+    document.getElementById('r-hbd').innerText = document.getElementById('edit-hbd').value;
+    document.getElementById('r-footer').innerText = document.getElementById('edit-footer').value;
+
+    const receiptDiv = document.getElementById('receipt-template');
+    html2canvas(receiptDiv, { scale: 3 }).then(canvas => {
+      currentImageUrl = canvas.toDataURL("image/jpeg", 1.0);
+      document.getElementById('result-image').src = currentImageUrl;
+      switchSection('step-result');
+    });
+  }
+
+  // 🖨️ ฟังก์ชันสั่งพิมพ์ออกเครื่องพิมพ์ทันที
+  function printReceipt() {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write('<html><head><title>Print Receipt</title>');
+    printWindow.document.write('<style>body { margin: 0; text-align: center; }</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write('<img src="' + currentImageUrl + '" style="width:100%; max-width:58mm;" onload="window.print();window.close()"/>');
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+  }
+
+  function sendImageToLine() {
+    const link = document.createElement('a');
+    link.download = `homjung_receipt_${document.getElementById('edit-shortOrderId').value}.jpg`;
+    link.href = currentImageUrl;
+    link.click();
+
+    setTimeout(() => {
+      alert("📥 บันทึกรูปสลิปกลงเครื่องเรียบร้อยแล้ว!\n\nLINE จะเปิดขึ้นมา ให้เลือกแชท แล้ว 'วางรูปภาพ' ส่งให้ลูกค้าได้เลยครับ 😊");
+      window.location.href = "https://line.me/R/";
+    }, 500);
+  }
+
+  window.onload = function() {
+    document.getElementById('uploadBtn').addEventListener('click', uploadImages);
+    document.getElementById('generateBtn').addEventListener('click', generateFinalReceipt);
+    document.getElementById('resetBtn').addEventListener('click', () => location.reload());
+    document.getElementById('printBtn').addEventListener('click', printReceipt);
+    document.getElementById('lineBtn').addEventListener('click', sendImageToLine);
+    document.getElementById('nextBtn').addEventListener('click', () => location.reload());
+  };
+</script>
+
+</body>
+</html>
